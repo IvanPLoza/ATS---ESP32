@@ -208,7 +208,7 @@ bool testCommunication(){
   }
 
   #ifdef TEST_MODE
-  Serial.prinln("Communication falied!");
+  Serial.println("Communication falied!");
   #endif //TEST_MODE
 
   return false;
