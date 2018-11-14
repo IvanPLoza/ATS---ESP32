@@ -7,9 +7,14 @@
  *  @author:      Ivan Pavao Lozancic ivanplozancic@gmail.com
  *  @date:        11-12-2018
  ****************************************************************************/
-
 #include <WiFi.h>
-#include <WebSocketClient.h>
+
+//#define WEBSOCKET
+#ifdef WEBSOCKET
+#include <WebSocketClient.h>  //Use WebSocket if defined
+#else
+#include <SocketIOClient.h>   //Use Socket.IO if WebSocket is not defined
+#endif //WEBSOCKET
 
 /****************************************************************************
  *                            Public definitions
@@ -19,17 +24,25 @@
 #define BAUD_RATE 115200
 #define TEST_MODE
 #define WIFI_ENABLE
+#define SERVER_CONNECT
 //#define DEBUG
 
 //WiFi Configuration
 #ifdef WIFI_ENABLE
 
-#define HOME
+//#define HOME
+#define DUMP
+//#define BLUE_CAFFE
 
 #ifdef HOME
 #define SSID      "Jonelo2"
 #define PASSWORD  "172030ZN"
 #endif //HOME
+
+#ifdef BLUE_CAFFE
+#define SSID      "BlueEyes2"
+#define PASSWORD  "blueeyes2"
+#endif //BLUE_EYES
 
 #ifdef DUMP
 #define SSID      "dump"
@@ -38,13 +51,22 @@
 
 #endif //WIFI_ENABLE
 
-//WebSocket server configuration
-#define HOST  "192.168.1.4"
+//Server configuration
+#ifdef SERVER_CONNECT
+#define HOST  "192.168.1.4"     //Replace with server IP
 #define PATH  "/" 
-#define PORT  8999
+#define PORT  1337
 #define TEST_DATA "DrazenDebil"
+#endif //SERVER_CONNECT
+
+#ifdef WEBSOCKET
 WebSocketClient webSocketClient;
 WiFiClient client;
+#else 
+SocketIOClient client;
+#endif //WEBSOCKET
+
+
 
 /****************************************************************************
  *                            Public functions
@@ -106,7 +128,7 @@ bool WiFiConnect(char ssid[], char password[]){
 /****************************************************************************
  *  @name:        clientConnect
  *  *************************************************************************
- *  @brief:       Check if client connection is established
+ *  @brief:       Check if client connection to server is established
  *  @note:
  *  *************************************************************************
  *  @param[in]:   char host []
@@ -123,7 +145,7 @@ bool clientConnect(char host[], uint16_t port){
   if(client.connect(host, port)){
 
     #ifdef TEST_MODE
-    Serial.println("Connected");
+    Serial.print("Connected to "); Serial.print(host); Serial.print(" to port:"); Serial.println(port);
     #endif //TEST_MODE
 
     return true;
@@ -152,6 +174,7 @@ bool clientConnect(char host[], uint16_t port){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-12-2018
  ***************************************************************************/
+#ifdef WEBSOCKET
 bool clientHandshake(char path[], char host[]){
 
   webSocketClient.path = path;
@@ -173,11 +196,13 @@ bool clientHandshake(char path[], char host[]){
   return false;
 
 }
+#endif //WEBSOCKET
 
 /****************************************************************************
  *  @name:        testCommunication
  *  *************************************************************************
- *  @brief:       Sends and receives data if communication is working
+ *  @brief:       Sends and receives data if WebSocket communication is 
+ *                working.
  *  @note:        IF THERE IS NO DATA FROM SERVER, COMMUNICATION IS
  *                CONSIDERED AS FAILED!
  *  *************************************************************************
@@ -189,7 +214,8 @@ bool clientHandshake(char path[], char host[]){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-12-2018
  ***************************************************************************/
-bool testCommunication(){
+#ifdef WEBSOCKET
+bool testCommunication_WEBSOCKET(){
 
   String dataReceived; //Received data
 
@@ -215,6 +241,8 @@ bool testCommunication(){
 
 
 }
+#endif //WEBSOCKET
+
 /****************************************************************************
  *                            Setup function
  ***************************************************************************/
@@ -226,7 +254,7 @@ void setup() {
 
   clientConnect(HOST, PORT);
 
-  clientHandshake(PATH, HOST);
+  //clientHandshake(PATH, HOST);
  
 }
 
@@ -237,7 +265,9 @@ void loop() {
  
   if(client.connected()){
  
-    testCommunication();
+    //testCommunication();
+
+    client.monitor();
  
   } else{
 
