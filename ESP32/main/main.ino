@@ -31,8 +31,10 @@
 #ifdef WIFI_ENABLE
 
 //#define HOME
-#define DUMP
+//#define DUMP
 //#define BLUE_CAFFE
+//#define RETRO
+#define MOBITEL
 
 #ifdef HOME
 #define SSID      "Jonelo2"
@@ -47,13 +49,23 @@
 #ifdef DUMP
 #define SSID      "dump"
 #define PASSWORD  "Dump.12345"
+#endif  //DUMP
+
+#ifdef RETRO
+#define SSID      "Retro_Caffe"
+#define PASSWORD  "Lozinka12345"
+#endif //RETRO
+
+#ifdef MOBITEL
+#define SSID      "loza"
+#define PASSWORD  "la123456"
 #endif
 
 #endif //WIFI_ENABLE
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.1.4"     //Replace with server IP
+#define HOST  "192.168.43.208"     //Replace with server IP
 #define PATH  "/" 
 #define PORT  1337
 #define TEST_DATA "DrazenDebil"
@@ -66,7 +78,21 @@ WiFiClient client;
 SocketIOClient client;
 #endif //WEBSOCKET
 
+//COMMANDS
+#define COMMAND_VEHICLEPASS   0x01
+#define COMMAND_CO2_UPDATE    0x02
+#define COMMAND_ERROR         0x03
+#define COMMAND_UNIT_INIT     0x04
 
+//TEST_DATA
+#define TESTDATA_COMMAND_VEHICLEPASS  "000000010000000001"
+#define TESTDATA_COMMAND_CO2UPDATE    "0000000100000000010000000001"
+#define TESTDATA_COMMAND_ERROR        "00000001000000000101"
+#define TESTDATA_COMMAND_UNITINIT     "000000000000000000000000000000000000000000000011"
+
+//TEMP DATA
+#define SECTOR 0x01
+#define ID     0x02
 
 /****************************************************************************
  *                            Public functions
@@ -93,6 +119,8 @@ bool WiFiConnect(char ssid[], char password[]){
   uint8_t connectTimeOverflow = 0;
 
   WiFi.begin(ssid, password); //Connect to wifi
+
+  Serial.print("Connecting to: "); Serial.println(ssid);
 
   //Check if device is connected
   while (WiFi.status() != WL_CONNECTED  && connectTimeOverflow < 50){
@@ -219,7 +247,7 @@ bool testCommunication_WEBSOCKET(){
 
   String dataReceived; //Received data
 
-  webSocketClient.sendData(TEST_DATA);
+  webSocketclient.sendData(TEST_DATA);
   webSocketClient.getData(dataReceived);
 
   if(dataReceived.length() > 0){
@@ -244,6 +272,99 @@ bool testCommunication_WEBSOCKET(){
 #endif //WEBSOCKET
 
 /****************************************************************************
+ *  @name:        sendTestData_SOCKETIO
+ *  *************************************************************************
+ *  @brief:       Sends test data to server
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      [true]  - command is correct
+ *                [false] - command is incorrect
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        11-16-2018
+ ***************************************************************************/
+bool sendTestData_SOCKETIO(uint8_t command){
+
+  String data;
+
+  if(command == COMMAND_VEHICLEPASS){
+
+    data = String(COMMAND_VEHICLEPASS) + TESTDATA_COMMAND_VEHICLEPASS;
+
+    client.sendJSON("update", data);
+
+    return true;
+
+  } else if(command = COMMAND_CO2_UPDATE){
+    
+    data = String(COMMAND_CO2_UPDATE) + TESTDATA_COMMAND_CO2UPDATE;
+
+    client.sendJSON("update", data);
+
+    return true;
+
+  } else if(command = COMMAND_ERROR){
+
+    data = String(COMMAND_ERROR) + TESTDATA_COMMAND_ERROR;
+
+    client.sendJSON("update", data);
+
+    return true;
+  
+  } else if(command = COMMAND_UNIT_INIT){
+
+    data = String(COMMAND_UNIT_INIT) + TESTDATA_COMMAND_UNITINIT;
+
+    client.sendJSON("update", data);
+
+    return true;
+
+  }
+
+  return false;
+}
+
+/****************************************************************************
+ *  @name:        updateLights
+ *  *************************************************************************
+ *  @brief:       Updates current traffic light state for defined secotr.
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:     
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        11-16-2018
+ ***************************************************************************/
+void updateLights(){
+}
+
+/****************************************************************************
+ *  @name:        vehicleStateUpdate
+ *  *************************************************************************
+ *  @brief:       Sends vehiclePass comand to server
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   string data - data buffer
+ *  @param[out]:   
+ *  @return:      
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        11-16-2018
+ ***************************************************************************/
+void vehicleStateUpdate(){
+
+  String data = String(COMMAND_VEHICLEPASS) + SECTOR + ID;
+
+  client.sendJSON("update", data);
+
+  delay(100);
+}
+
+/****************************************************************************
  *                            Setup function
  ***************************************************************************/
 void setup() {
@@ -254,7 +375,12 @@ void setup() {
 
   clientConnect(HOST, PORT);
 
-  //clientHandshake(PATH, HOST);
+  delay(1000);
+
+  sendTestData_SOCKETIO(COMMAND_VEHICLEPASS);
+  sendTestData_SOCKETIO(COMMAND_CO2_UPDATE);
+  sendTestData_SOCKETIO(COMMAND_ERROR);
+  sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
  
 }
 
@@ -262,19 +388,5 @@ void setup() {
  *                            Main function
  ***************************************************************************/
 void loop() {
- 
-  if(client.connected()){
- 
-    //testCommunication();
-
-    client.monitor();
- 
-  } else{
-
-    #ifdef TEST_MODE 
-    Serial.println("Client disconnected.");
-    #endif //TEST_MODE
-
-  }
  
 }
