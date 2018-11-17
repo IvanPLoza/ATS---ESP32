@@ -8,6 +8,7 @@
  *  @date:        11-12-2018
  ****************************************************************************/
 #include <WiFi.h>
+#include <Int64String.h>
 
 //#define WEBSOCKET
 #ifdef WEBSOCKET
@@ -31,10 +32,11 @@
 #ifdef WIFI_ENABLE
 
 //#define HOME
-//#define DUMP
+#define DUMP
 //#define BLUE_CAFFE
 //#define RETRO
-#define MOBITEL
+//#define MOBITEL
+//#define DOMACIN
 
 #ifdef HOME
 #define SSID      "Jonelo2"
@@ -61,11 +63,16 @@
 #define PASSWORD  "la123456"
 #endif
 
+#ifdef DOMACIN
+#define SSID      "Domacin"
+#define PASSWORD  "domacin123"
+#endif //DOMACIN
+
 #endif //WIFI_ENABLE
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.43.208"     //Replace with server IP
+#define HOST  "192.168.88.198"     //Replace with server IP
 #define PATH  "/" 
 #define PORT  1337
 #define TEST_DATA "DrazenDebil"
@@ -74,23 +81,24 @@
 #ifdef WEBSOCKET
 WebSocketClient webSocketClient;
 WiFiClient client;
-#else 
+#else
 SocketIOClient client;
 #endif //WEBSOCKET
 
 //COMMANDS
-#define COMMAND_VEHICLEPASS   0x01
-#define COMMAND_CO2_UPDATE    0x02
-#define COMMAND_ERROR         0x03
-#define COMMAND_UNIT_INIT     0x04
+uint8_t COMMAND_VEHICLEPASS = 0x01;
+uint8_t COMMAND_CO2_UPDATE  = 0x02;
+uint8_t COMMAND_ERROR       = 0x03;
+uint8_t COMMAND_UNIT_INIT   = 0x04;
 
 //TEST_DATA
-#define TESTDATA_COMMAND_VEHICLEPASS  "000000010000000001"
-#define TESTDATA_COMMAND_CO2UPDATE    "0000000100000000010000000001"
-#define TESTDATA_COMMAND_ERROR        "00000001000000000101"
-#define TESTDATA_COMMAND_UNITINIT     "000000000000000000000000000000000000000000000011"
+uint64_t TESTDATA_COMMAND_VEHICLEPASS =  0x20001;         //command + 100000000000000001 = 1100000000000000001 = 393217
+uint64_t TESTDATA_COMMAND_CO2UPDATE =    0x100401;        //command + 1000000000000000000000000001 = 10100000000010000000001 = 5243905
+uint64_t TESTDATA_COMMAND_ERROR =        0x1005;          //command + 10000000000000000001 = 111000000000101 = 28677
+uint64_t TESTDATA_COMMAND_UNITINIT =     0x4000000000003; //command + 100000000000000000000000000000000000000000000000001 
+                                                          //   = 100100000000000000000000000000000000000000000000001 = 140737488355331 
 
-//TEMP DATA
+//TEMP DATA 
 #define SECTOR 0x01
 #define ID     0x02
 
@@ -209,12 +217,12 @@ bool clientHandshake(char path[], char host[]){
   webSocketClient.host = host;
 
   if(webSocketClient.handshake(client)) {
+
     #ifdef TEST_MODE
     Serial.println("Handshake with WebSocket server was successful!");
     #endif //TEST_MODE
 
     return true;
-
   }
 
   #ifdef TEST_MODE
@@ -222,7 +230,6 @@ bool clientHandshake(char path[], char host[]){
   #endif //TEST_MODE
     
   return false;
-
 }
 #endif //WEBSOCKET
 
@@ -266,8 +273,6 @@ bool testCommunication_WEBSOCKET(){
   #endif //TEST_MODE
 
   return false;
-
-
 }
 #endif //WEBSOCKET
 
@@ -288,42 +293,57 @@ bool testCommunication_WEBSOCKET(){
 bool sendTestData_SOCKETIO(uint8_t command){
 
   String data;
+  uint64_t dataBuffer;
 
   if(command == COMMAND_VEHICLEPASS){
 
-    data = String(COMMAND_VEHICLEPASS) + TESTDATA_COMMAND_VEHICLEPASS;
+    dataBuffer = ((uint64_t)COMMAND_VEHICLEPASS) << 18 | TESTDATA_COMMAND_VEHICLEPASS;
+
+    data = String(int64String(dataBuffer));
 
     client.sendJSON("update", data);
 
-    return true;
-
-  } else if(command = COMMAND_CO2_UPDATE){
+  } else if(command == COMMAND_CO2_UPDATE){
     
-    data = String(COMMAND_CO2_UPDATE) + TESTDATA_COMMAND_CO2UPDATE;
+    dataBuffer = (uint64_t)COMMAND_CO2_UPDATE << 28 | TESTDATA_COMMAND_CO2UPDATE;
+
+    data = String(int64String(dataBuffer));
+
 
     client.sendJSON("update", data);
 
-    return true;
+  } else if(command == COMMAND_ERROR){
 
-  } else if(command = COMMAND_ERROR){
+    dataBuffer = (uint64_t)COMMAND_ERROR << 20 | TESTDATA_COMMAND_ERROR;
 
-    data = String(COMMAND_ERROR) + TESTDATA_COMMAND_ERROR;
+    data = String(int64String(dataBuffer));
+
 
     client.sendJSON("update", data);
-
-    return true;
   
-  } else if(command = COMMAND_UNIT_INIT){
+  } else if(command == COMMAND_UNIT_INIT){
 
-    data = String(COMMAND_UNIT_INIT) + TESTDATA_COMMAND_UNITINIT;
+    dataBuffer = (uint64_t)COMMAND_UNIT_INIT << 48 | TESTDATA_COMMAND_UNITINIT;
+
+    data = String(int64String(dataBuffer));
 
     client.sendJSON("update", data);
 
-    return true;
+  } else {
 
+    #ifdef TEST_MODE
+    Serial.print("Command "); Serial.print(command); Serial.println(" is incorrect! Couldn't send data to server!");
+    #endif //TEST_MODE
+
+    return false;
   }
 
-  return false;
+  #ifdef TEST_MODE
+  Serial.print("Command "); Serial.print(command); Serial.println(" was sent to server.");
+  Serial.print("Buffer: "); Serial.println(int64String(dataBuffer)); Serial.println();
+  #endif //TEST_MODE
+
+  return true;
 }
 
 /****************************************************************************
