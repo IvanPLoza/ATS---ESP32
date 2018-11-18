@@ -31,8 +31,8 @@
 //WiFi Configuration
 #ifdef WIFI_ENABLE
 
-//#define HOME
-#define DUMP
+#define HOME
+//#define DUMP
 //#define BLUE_CAFFE
 //#define RETRO
 //#define MOBITEL
@@ -72,7 +72,7 @@
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.88.198"     //Replace with server IP
+#define HOST  "192.168.1.12"     //Replace with server IP
 #define PATH  "/" 
 #define PORT  1337
 #define TEST_DATA "DrazenDebil"
@@ -86,17 +86,24 @@ SocketIOClient client;
 #endif //WEBSOCKET
 
 //COMMANDS
-uint8_t COMMAND_VEHICLEPASS = 0x01;
-uint8_t COMMAND_CO2_UPDATE  = 0x02;
-uint8_t COMMAND_ERROR       = 0x03;
-uint8_t COMMAND_UNIT_INIT   = 0x04;
+#define COMMAND_VEHICLEPASS 0x01
+#define COMMAND_CO2_UPDATE  0x02
+#define COMMAND_ERROR       0x03
+#define COMMAND_UNIT_INIT   0x04
 
 //TEST_DATA
-uint64_t TESTDATA_COMMAND_VEHICLEPASS =  0x20001;         //command + 100000000000000001 = 1100000000000000001 = 393217
-uint64_t TESTDATA_COMMAND_CO2UPDATE =    0x100401;        //command + 1000000000000000000000000001 = 10100000000010000000001 = 5243905
-uint64_t TESTDATA_COMMAND_ERROR =        0x1005;          //command + 10000000000000000001 = 111000000000101 = 28677
-uint64_t TESTDATA_COMMAND_UNITINIT =     0x4000000000003; //command + 100000000000000000000000000000000000000000000000001 
-                                                          //   = 100100000000000000000000000000000000000000000000001 = 140737488355331 
+#define TESTDATA_COMMAND_VEHICLEPASS  0x20001         
+//command + 100000000000000001 = 1100000000000000001 = 393217
+
+#define TESTDATA_COMMAND_CO2UPDATE    0x8000001        
+//command + 1000000000000000000000000001 = 101000000000000000000000000001 = 671088641
+
+#define TESTDATA_COMMAND_ERROR        0x80001         
+//command + 10000000000000000001 = 1110000000000000000001 = 3670017
+
+#define TESTDATA_COMMAND_UNITINIT     0x800000000001
+//command + 100000000000000000000000000000000000000000000001 
+//= 100100000000000000000000000000000000000000000000001 = 1266637395197953 
 
 //TEMP DATA 
 #define SECTOR 0x01
@@ -297,7 +304,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
 
   if(command == COMMAND_VEHICLEPASS){
 
-    dataBuffer = ((uint64_t)COMMAND_VEHICLEPASS) << 18 | TESTDATA_COMMAND_VEHICLEPASS;
+    dataBuffer = (uint64_t)COMMAND_VEHICLEPASS << 18 | (uint64_t)TESTDATA_COMMAND_VEHICLEPASS;
 
     data = String(int64String(dataBuffer));
 
@@ -305,7 +312,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
 
   } else if(command == COMMAND_CO2_UPDATE){
     
-    dataBuffer = (uint64_t)COMMAND_CO2_UPDATE << 28 | TESTDATA_COMMAND_CO2UPDATE;
+    dataBuffer = (uint64_t)COMMAND_CO2_UPDATE << 28 | (uint64_t)TESTDATA_COMMAND_CO2UPDATE;
 
     data = String(int64String(dataBuffer));
 
@@ -314,7 +321,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
 
   } else if(command == COMMAND_ERROR){
 
-    dataBuffer = (uint64_t)COMMAND_ERROR << 20 | TESTDATA_COMMAND_ERROR;
+    dataBuffer = (uint64_t)COMMAND_ERROR << 20 | (uint64_t)TESTDATA_COMMAND_ERROR;
 
     data = String(int64String(dataBuffer));
 
@@ -323,7 +330,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
   
   } else if(command == COMMAND_UNIT_INIT){
 
-    dataBuffer = (uint64_t)COMMAND_UNIT_INIT << 48 | TESTDATA_COMMAND_UNITINIT;
+    dataBuffer = (uint64_t)COMMAND_UNIT_INIT << 48 | (uint64_t)TESTDATA_COMMAND_UNITINIT;
 
     data = String(int64String(dataBuffer));
 
