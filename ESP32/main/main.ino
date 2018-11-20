@@ -83,6 +83,9 @@ WebSocketClient webSocketClient;
 WiFiClient client;
 #else
 SocketIOClient client;
+extern String RID;
+extern String Rname;
+extern String Rcontent;
 #endif //WEBSOCKET
 
 //COMMANDS
@@ -304,7 +307,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
 
   if(command == COMMAND_VEHICLEPASS){
 
-    dataBuffer = (uint64_t)COMMAND_VEHICLEPASS << 18 | (uint64_t)TESTDATA_COMMAND_VEHICLEPASS;
+    dataBuffer = (uint64_t)TESTDATA_COMMAND_VEHICLEPASS << 4 | (uint64_t)COMMAND_VEHICLEPASS;
 
     data = String(int64String(dataBuffer));
 
@@ -312,7 +315,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
 
   } else if(command == COMMAND_CO2_UPDATE){
     
-    dataBuffer = (uint64_t)COMMAND_CO2_UPDATE << 28 | (uint64_t)TESTDATA_COMMAND_CO2UPDATE;
+    dataBuffer = (uint64_t)TESTDATA_COMMAND_CO2UPDATE << 4 | (uint64_t)COMMAND_CO2_UPDATE;
 
     data = String(int64String(dataBuffer));
 
@@ -321,7 +324,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
 
   } else if(command == COMMAND_ERROR){
 
-    dataBuffer = (uint64_t)COMMAND_ERROR << 20 | (uint64_t)TESTDATA_COMMAND_ERROR;
+    dataBuffer = (uint64_t)TESTDATA_COMMAND_ERROR << 4 | (uint64_t)COMMAND_ERROR;
 
     data = String(int64String(dataBuffer));
 
@@ -330,7 +333,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
   
   } else if(command == COMMAND_UNIT_INIT){
 
-    dataBuffer = (uint64_t)COMMAND_UNIT_INIT << 48 | (uint64_t)TESTDATA_COMMAND_UNITINIT;
+    dataBuffer = (uint64_t)TESTDATA_COMMAND_UNITINIT << 4 | (uint64_t)COMMAND_UNIT_INIT;
 
     data = String(int64String(dataBuffer));
 
@@ -392,6 +395,123 @@ void vehicleStateUpdate(){
 }
 
 /****************************************************************************
+ *  @name:        command_UnitInit
+ *  *************************************************************************
+ *  @brief:       Command UNIT_INIT function.
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        11-20-2018
+ ***************************************************************************/
+void command_UnitInit(){
+
+}
+
+/****************************************************************************
+ *  @name:        command_DimUpdate
+ *  *************************************************************************
+ *  @brief:       Command DIM_UPDATE function.
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        11-20-2018
+ ***************************************************************************/
+void command_DimUpdate(){
+  
+}
+
+/****************************************************************************
+ *  @name:        command_OTA
+ *  *************************************************************************
+ *  @brief:       Command OTA function.
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        11-20-2018
+ ***************************************************************************/
+void command_OTA(){
+  
+}
+
+/****************************************************************************
+ *  @name:        commandHandler
+ *  *************************************************************************
+ *  @brief:       Reads data from server and executes related command
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      [true]  - read data includes command
+ *                [false] - read data is false
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        11-20-2018
+ ***************************************************************************/
+bool commandHandler(){
+
+  uint8_t command;
+  uint64_t data;
+  uint8_t COUNTER;
+
+  if(client.monitor()){
+
+    #ifdef TEST_MODE
+    Serial.print("Received data from server! Timestamp: "); Serial.println(millis());
+    #endif //TEST_MODE
+
+    for (COUNTER = 0; COUNTER < 64; COUNTER++) {
+      	uint64_t bit = Rcontent[COUNTER] - '0';
+        data |= (bit << COUNTER);
+    }
+
+    command = data & 0xF; //First four bits
+
+    switch(command){
+
+      case 0x04: //UNIT_INIT
+
+        command_UnitInit();
+
+        return true;
+      break;
+
+      case 0x05: //DIM_UPDATE
+
+        command_DimUpdate(); 
+        
+        return true;
+      break;
+
+      case 0x06:
+
+        /*command_OTA(); //TBA */
+
+        return true;
+      break;
+
+      default:
+
+        //Command not found
+
+        return false;
+      break;
+    }
+  }
+}
+
+/****************************************************************************
  *                            Setup function
  ***************************************************************************/
 void setup() {
@@ -415,5 +535,7 @@ void setup() {
  *                            Main function
  ***************************************************************************/
 void loop() {
- 
+
+  commandHandler();
+
 }
