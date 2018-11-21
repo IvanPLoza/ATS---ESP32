@@ -31,9 +31,9 @@
 //WiFi Configuration
 #ifdef WIFI_ENABLE
 
-#define HOME
+//#define HOME
 //#define DUMP
-//#define BLUE_CAFFE
+#define BLUE_CAFFE
 //#define RETRO
 //#define MOBITEL
 //#define DOMACIN
@@ -44,8 +44,8 @@
 #endif //HOME
 
 #ifdef BLUE_CAFFE
-#define SSID      "BlueEyes2"
-#define PASSWORD  "blueeyes2"
+#define SSID      "Blue Eyes"
+#define PASSWORD  "blueeyes"
 #endif //BLUE_EYES
 
 #ifdef DUMP
@@ -72,9 +72,9 @@
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.1.12"     //Replace with server IP
+#define HOST  "192.168.88.222"     //Replace with server IP
 #define PATH  "/" 
-#define PORT  1337
+#define PORT  2000
 #define TEST_DATA "DrazenDebil"
 #endif //SERVER_CONNECT
 
@@ -95,18 +95,21 @@ extern String Rcontent;
 #define COMMAND_UNIT_INIT   0x04
 
 //TEST_DATA
-#define TESTDATA_COMMAND_VEHICLEPASS  0x20001         
-//command + 100000000000000001 = 1100000000000000001 = 393217
+#define TESTDATA_COMMAND_VEHICLEPASS  0x81         
+//10000001 + command = 100000010001 = 2065
+//129
 
-#define TESTDATA_COMMAND_CO2UPDATE    0x8000001        
-//command + 1000000000000000000000000001 = 101000000000000000000000000001 = 671088641
+#define TESTDATA_COMMAND_CO2UPDATE    0x201       
+//1000000001 + command = 10000000010010 = 8210
+//513
 
-#define TESTDATA_COMMAND_ERROR        0x80001         
-//command + 10000000000000000001 = 1110000000000000000001 = 3670017
+#define TESTDATA_COMMAND_ERROR        0x03      
+//11 + command = 110011 = 51
+//3
 
 #define TESTDATA_COMMAND_UNITINIT     0x800000000001
-//command + 100000000000000000000000000000000000000000000001 
-//= 100100000000000000000000000000000000000000000000001 = 1266637395197953 
+//100000000000000000000000000000000000000000000001 + command = 2251799813685268
+//140737488355329 
 
 //TEMP DATA 
 #define SECTOR 0x01
@@ -311,7 +314,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
 
     data = String(int64String(dataBuffer));
 
-    client.sendJSON("update", data);
+    client.sendJSON("", data);
 
   } else if(command == COMMAND_CO2_UPDATE){
     
@@ -320,7 +323,7 @@ bool sendTestData_SOCKETIO(uint8_t command){
     data = String(int64String(dataBuffer));
 
 
-    client.sendJSON("update", data);
+    client.sendJSON("", data);
 
   } else if(command == COMMAND_ERROR){
 
@@ -329,15 +332,13 @@ bool sendTestData_SOCKETIO(uint8_t command){
     data = String(int64String(dataBuffer));
 
 
-    client.sendJSON("update", data);
+    client.sendJSON("", data);
   
   } else if(command == COMMAND_UNIT_INIT){
 
-    dataBuffer = (uint64_t)TESTDATA_COMMAND_UNITINIT << 4 | (uint64_t)COMMAND_UNIT_INIT;
+    data = String(int64String((uint64_t)TESTDATA_COMMAND_UNITINIT));
 
-    data = String(int64String(dataBuffer));
-
-    client.sendJSON("update", data);
+    client.sendJSON("init", data);
 
   } else {
 
@@ -387,7 +388,7 @@ void updateLights(){
  ***************************************************************************/
 void vehicleStateUpdate(){
 
-  String data = String(COMMAND_VEHICLEPASS) + SECTOR + ID;
+  String data = int64String(COMMAND_VEHICLEPASS);
 
   client.sendJSON("update", data);
 
@@ -471,10 +472,15 @@ bool commandHandler(){
     Serial.print("Received data from server! Timestamp: "); Serial.println(millis());
     #endif //TEST_MODE
 
+    //String to uint64_t conversion
     for (COUNTER = 0; COUNTER < 64; COUNTER++) {
       	uint64_t bit = Rcontent[COUNTER] - '0';
         data |= (bit << COUNTER);
     }
+
+    #ifdef TEST_MODE 
+    Serial.print("Recieved data decrypted value: "); Serial.println(int64String(data));
+    #endif //TEST_MODE
 
     command = data & 0xF; //First four bits
 
@@ -494,7 +500,7 @@ bool commandHandler(){
         return true;
       break;
 
-      case 0x06:
+      case 0x06: //OTA
 
         /*command_OTA(); //TBA */
 
