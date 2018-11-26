@@ -341,7 +341,9 @@ bool sendTestData_SOCKETIO(uint8_t command){
   
   } else if(command == COMMAND_UNIT_INIT){
 
-    data = String(int64String((uint64_t)TESTDATA_COMMAND_UNITINIT));
+    dataBuffer = (uint64_t)TESTDATA_COMMAND_UNITINIT;
+
+    data = String(int64String(dataBuffer));
 
     client.sendJSON("init", data);
 
@@ -535,10 +537,10 @@ void setup() {
 
   delay(1000);
 
+  sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
   sendTestData_SOCKETIO(COMMAND_VEHICLEPASS);
   sendTestData_SOCKETIO(COMMAND_CO2_UPDATE);
   sendTestData_SOCKETIO(COMMAND_ERROR);
-  sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
  
 }
 
