@@ -33,9 +33,9 @@
 
 //#define HOME
 //#define DUMP
-#define BLUE_CAFFE
+//#define BLUE_CAFFE
 //#define RETRO
-//#define MOBITEL
+#define MOBITEL
 //#define DOMACIN
 
 #ifdef HOME
@@ -72,7 +72,7 @@
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.88.222"     //Replace with server IP
+#define HOST  "192.168.43.208"     //Replace with server IP
 #define PATH  "/" 
 #define PORT  2000
 #define TEST_DATA "DrazenDebil"
@@ -93,6 +93,11 @@ extern String Rcontent;
 #define COMMAND_CO2_UPDATE  0x02
 #define COMMAND_ERROR       0x03
 #define COMMAND_UNIT_INIT   0x04
+
+//ERROR definitions
+#define ERR_CO2SENS_FALIURE 0x01
+#define ERR_CARSENS_FALIURE 0x02
+#define ERR_LIGHT_FALIURE   0x03
 
 //TEST_DATA
 #define TESTDATA_COMMAND_VEHICLEPASS  0x81         
@@ -388,7 +393,7 @@ void updateLights(){
  ***************************************************************************/
 void vehicleStateUpdate(){
 
-  String data = int64String(COMMAND_VEHICLEPASS);
+  String data = String(COMMAND_VEHICLEPASS);
 
   client.sendJSON("update", data);
 
