@@ -9,6 +9,7 @@
  ****************************************************************************/
 #include <WiFi.h>
 #include <Int64String.h>
+#include <string>
 
 //#define WEBSOCKET
 #ifdef WEBSOCKET
@@ -35,8 +36,9 @@
 //#define DUMP
 //#define BLUE_CAFFE
 //#define RETRO
-#define MOBITEL
+//#define MOBITEL
 //#define DOMACIN
+#define EXELIA
 
 #ifdef HOME
 #define SSID      "Jonelo2"
@@ -68,11 +70,16 @@
 #define PASSWORD  "domacin123"
 #endif //DOMACIN
 
+#ifdef EXELIA
+#define SSID      "Exelia"
+#define PASSWORD  "nismofirma"
+#endif //EXELIA
+
 #endif //WIFI_ENABLE
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.43.208"     //Replace with server IP
+#define HOST  "192.168.0.25"     //Replace with server IP
 #define PATH  "/" 
 #define PORT  2000
 #define TEST_DATA "DrazenDebil"
@@ -118,7 +125,15 @@ extern String Rcontent;
 
 //TEMP DATA 
 #define SECTOR 0x01
-#define ID     0x02
+#define ID     0x02¸
+
+//VEHICLE_PASS configuration
+#define TIMER_VP_COMPARE  180000
+uint32_t previousTime = 0;
+uint8_t car_num = 0;
+
+//CO2_UPDATE configuration
+#define TIMER_CU_COMPARE 300000
 
 /****************************************************************************
  *                            Public functions
@@ -393,11 +408,13 @@ void updateLights(){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-16-2018
  ***************************************************************************/
-void vehicleStateUpdate(){
+void vehicleStateUpdate(uint8_t CAR_NUM){
 
-  String data = String(COMMAND_VEHICLEPASS);
+  uint32_t data = (CAR_NUM << 4) | COMMAND_VEHICLEPASS;
+  
+  String dataBuffer = String(data);
 
-  client.sendJSON("update", data);
+  client.sendJSON("update", dataBuffer);
 
   delay(100);
 }
@@ -415,8 +432,7 @@ void vehicleStateUpdate(){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-20-2018
  ***************************************************************************/
-void command_UnitInit(){
-
+void command_UnitInit(uint64_t DATA){
 }
 
 /****************************************************************************
@@ -432,7 +448,7 @@ void command_UnitInit(){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-20-2018
  ***************************************************************************/
-void command_DimUpdate(){
+void command_DimUpdate(uint64_t DATA){
   
 }
 
@@ -449,7 +465,7 @@ void command_DimUpdate(){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-20-2018
  ***************************************************************************/
-void command_OTA(){
+void command_OTA(uint64_t DATA){
   
 }
 
@@ -470,58 +486,119 @@ void command_OTA(){
 bool commandHandler(){
 
   uint8_t command;
-  uint64_t data;
+  uint64_t dataValue;
   uint8_t COUNTER;
+  uint8_t COUNTER_2;
+  uint8_t charsSize;
+  char data[] = "";
 
   if(client.monitor()){
 
     #ifdef TEST_MODE
     Serial.print("Received data from server! Timestamp: "); Serial.println(millis());
-    #endif //TEST_MODE
+    #endif //TEST_MODEž
 
-    //String to uint64_t conversion
-    for (COUNTER = 0; COUNTER < 64; COUNTER++) {
-      	uint64_t bit = Rcontent[COUNTER] - '0';
-        data |= (bit << COUNTER);
+    for(COUNTER = 0; COUNTER < Rcontent.length(); COUNTER++){
+      if(Rcontent.charAt(COUNTER) == ','){
+
+        charsSize = Rcontent.length() - 2 - COUNTER;
+
+        for(COUNTER_2 = COUNTER + 1; COUNTER_2 < Rcontent.length() - 1; COUNTER_2++){
+          data[COUNTER_2 - COUNTER - 1] = Rcontent.charAt(COUNTER_2);
+        }
+        
+        COUNTER = Rcontent.length();
+      }
     }
 
+    dataValue = (uint64_t)atoi(data);
+
     #ifdef TEST_MODE 
-    Serial.print("Recieved data decrypted value: "); Serial.println(int64String(data));
+    Serial.print("Recieved data decrypted value: "); Serial.println(data);
+    Serial.print("Data value: "); Serial.println(int64String(dataValue));
     #endif //TEST_MODE
 
-    command = data & 0xF; //First four bits
+    command = dataValue & 0xF; //First four bits
 
     switch(command){
 
       case 0x04: //UNIT_INIT
 
-        command_UnitInit();
-
-        return true;
+        command_UnitInit(dataValue);
       break;
 
       case 0x05: //DIM_UPDATE
 
-        command_DimUpdate(); 
-        
-        return true;
+        command_DimUpdate(dataValue); 
       break;
 
       case 0x06: //OTA
 
-        /*command_OTA(); //TBA */
-
-        return true;
+        command_OTA(dataValue);
       break;
 
       default:
 
         //Command not found
 
+        #ifdef TEST_MODE
+        Serial.println("Received invalid command/data from server.");
+        #endif //TEST_MODE
+
         return false;
       break;
     }
+
+    #ifdef TEST_MODE
+    Serial.print("Received command: "); Serial.println(command); Serial.println();
+    #endif //TEST_MODE
+
+    return true;
   }
+  return false;
+}
+/****************************************************************************
+ *  @name:        checkCarPass
+ *  *************************************************************************
+ *  @brief:       Reads data from sensor and counts cars that passed
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        12-01-2018
+ ***************************************************************************/
+void checkCarPass(){
+
+  uint32_t currentTime = millis();
+
+  if(currentTime == previousTime + TIMER_VP_COMPARE){
+
+    previousTime = currentTime;
+
+    vehicleStateUpdate(car_num);
+
+    car_num = 0;
+  }
+}
+
+/****************************************************************************
+ *  @name:        checkCO2Emissions
+ *  *************************************************************************
+ *  @brief:       Reads data from sensor and saves emissions
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        12-01-2018
+ ***************************************************************************/
+void checkCO2Emissions(){
+
 }
 
 /****************************************************************************
@@ -537,10 +614,12 @@ void setup() {
 
   delay(1000);
 
-  sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
+  /*sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
   sendTestData_SOCKETIO(COMMAND_VEHICLEPASS);
   sendTestData_SOCKETIO(COMMAND_CO2_UPDATE);
-  sendTestData_SOCKETIO(COMMAND_ERROR);
+  sendTestData_SOCKETIO(COMMAND_ERROR);*/
+
+  sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
  
 }
 
@@ -550,5 +629,7 @@ void setup() {
 void loop() {
 
   commandHandler();
+
+  checkCarPass();
 
 }
