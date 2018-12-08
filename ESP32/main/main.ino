@@ -33,12 +33,12 @@
 #ifdef WIFI_ENABLE
 
 //#define HOME
-//#define DUMP
+#define DUMP
 //#define BLUE_CAFFE
 //#define RETRO
 //#define MOBITEL
 //#define DOMACIN
-#define EXELIA
+//#define EXELIA
 
 #ifdef HOME
 #define SSID      "Jonelo2"
@@ -79,7 +79,7 @@
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.0.25"     //Replace with server IP
+#define HOST  "192.168.88.176"     //Replace with server IP
 #define PATH  "/" 
 #define PORT  2000
 #define TEST_DATA "DrazenDebil"
@@ -380,6 +380,54 @@ bool sendTestData_SOCKETIO(uint8_t command){
 }
 
 /****************************************************************************
+ *  @name:        sendCommand_UnitInit
+ *  *************************************************************************
+ *  @brief:       Sends test UNIT_INIT commnad with data to server
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:     
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        12-08-2018
+ ***************************************************************************/
+void sendCommand_UnitInit(){
+  uint8_t MAC[6];
+  uint64_t MACBuffer = 0;
+  uint64_t dataBuffer;
+  uint8_t COUNTER;
+  String data;
+
+  //Get MAC Address
+  WiFi.macAddress(MAC);
+
+  //Mac address encryption
+  for(COUNTER = 0; COUNTER < 6; COUNTER++){
+    MACBuffer = (uint64_t)MAC[COUNTER] << (40 - (8 * COUNTER)) | MACBuffer;
+    
+    #ifdef TEST_MODE
+    Serial.print("MAC["); Serial.print(COUNTER); Serial.print("] = "); Serial.println(MAC[COUNTER]);
+    #endif //TEST_MODE
+
+  }
+
+  //Data encryption for UNIT_INIT command
+  dataBuffer = MACBuffer << 4 | (uint64_t)COMMAND_UNIT_INIT;
+
+  //Packing data buffer into string
+  data = String(int64String(dataBuffer));
+
+  #ifdef TEST_MODE
+  Serial.print("MACBuffer = "); Serial.println(int64String(MACBuffer));
+  Serial.print("Data buffer = "); Serial.println(data);
+  #endif //TEST_MODE
+
+  //Sending command with data to server
+  //client.sendJSON("init", data);
+}
+
+/****************************************************************************
  *  @name:        updateLights
  *  *************************************************************************
  *  @brief:       Updates current traffic light state for defined secotr.
@@ -433,6 +481,8 @@ void vehicleStateUpdate(uint8_t CAR_NUM){
  *  @date:        11-20-2018
  ***************************************************************************/
 void command_UnitInit(uint64_t DATA){
+
+
 }
 
 /****************************************************************************
@@ -620,6 +670,8 @@ void setup() {
   sendTestData_SOCKETIO(COMMAND_ERROR);*/
 
   sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
+
+  sendCommand_UnitInit();
  
 }
 
