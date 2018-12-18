@@ -12,6 +12,9 @@
 #include <string>
 
 //#define WEBSOCKET
+
+//#define WEBSOCKET
+
 #ifdef WEBSOCKET
 #include <WebSocketClient.h>  //Use WebSocket if defined
 #else
@@ -32,8 +35,8 @@
 //WiFi Configuration
 #ifdef WIFI_ENABLE
 
-//#define HOME
-#define DUMP
+#define HOME
+//#define DUMP
 //#define BLUE_CAFFE
 //#define RETRO
 //#define MOBITEL
@@ -79,7 +82,7 @@
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.88.176"     //Replace with server IP
+#define HOST  "192.168.1.9"
 #define PATH  "/" 
 #define PORT  2000
 #define TEST_DATA "DrazenDebil"
@@ -90,6 +93,7 @@ WebSocketClient webSocketClient;
 WiFiClient client;
 #else
 SocketIOClient client;
+WiFiClient wificlient;
 extern String RID;
 extern String Rname;
 extern String Rcontent;
@@ -456,7 +460,7 @@ void updateLights(){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-16-2018
  ***************************************************************************/
-void vehicleStateUpdate(uint8_t CAR_NUM){
+/*void vehicleStateUpdate(uint8_t CAR_NUM){
 
   uint32_t data = (CAR_NUM << 4) | COMMAND_VEHICLEPASS;
   
@@ -465,7 +469,7 @@ void vehicleStateUpdate(uint8_t CAR_NUM){
   client.sendJSON("update", dataBuffer);
 
   delay(100);
-}
+}*/
 
 /****************************************************************************
  *  @name:        command_UnitInit
@@ -628,7 +632,7 @@ void checkCarPass(){
 
     previousTime = currentTime;
 
-    vehicleStateUpdate(car_num);
+    //vehicleStateUpdate(car_num);
 
     car_num = 0;
   }
@@ -660,18 +664,22 @@ void setup() {
  
   WiFiConnect(SSID, PASSWORD);
 
-  clientConnect(HOST, PORT);
+  //clientConnect(HOST, PORT);
+
+  wificlient.connect(HOST, PORT);
+  wificlient.println("GET /?mac=test HTTP/1.1"); 
+  wificlient.println();
+
+  //client.sendJSON("mac", "2222");
 
   delay(1000);
 
-  /*sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
+  /*endTestData_SOCKETIO(COMMAND_UNIT_INIT);
   sendTestData_SOCKETIO(COMMAND_VEHICLEPASS);
   sendTestData_SOCKETIO(COMMAND_CO2_UPDATE);
-  sendTestData_SOCKETIO(COMMAND_ERROR);*/
+  sendTestData_SOCKETIO(COMMAND_ERROR);
 
-  sendTestData_SOCKETIO(COMMAND_UNIT_INIT);
-
-  sendCommand_UnitInit();
+  sendCommand_UnitInit();*/
  
 }
 
@@ -680,7 +688,8 @@ void setup() {
  ***************************************************************************/
 void loop() {
 
-  commandHandler();
+  //commandHandler();
+  // HTTP Basic Authorization
 
   checkCarPass();
 
