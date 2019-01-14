@@ -8,10 +8,8 @@
  *  @date:        11-12-2018
  ****************************************************************************/
 #include <WiFi.h>
-#include <Wire.h>
 #include <Int64String.h>
 #include <string>
-#include <cmath>
 
 //#define WEBSOCKET
 
@@ -31,7 +29,9 @@
 //#define TEST_MODE_US //ULTRASONIC TEST
 #define WIFI_ENABLE
 #define SERVER_CONNECT
+//#define TEST_COMMANDS
 //#define DEBUG
+#define US_CONNECTED
 
 //HC-SR04 Configuration
 #define US_ECHO           0x0C
@@ -40,19 +40,28 @@
 #define SECOND_LANE_COMP  40
 
 //LED PWM Control setup
-#define LEDC_CHANNEL_0     0        //Use channel 0 of max 16
-#define LEDC_TIMER_13_BIT  13       //Precision
-#define LEDC_BASE_FREQ     5000     //PWM base freq
-#define LIGHT_PIN          0x1B     //GPIO-27
-uint8_t light_config[2] =  {0, 0};  //[STATE] - [BRIGHTNESS]
+#define LEDC_CHANNEL_0        0         //Use channel 0 of max 16
+#define LEDC_TIMER_13_BIT     13        //Precision
+#define LEDC_BASE_FREQ        5000      //PWM base freq
+#define LIGHT_PIN             0x1B      //GPIO-27
+                                        //DEFAULT MODE
+#define DEFAULT_BRIGHTNESS    0x7F      //127 - 50%
+#define DEFAULT_MODE          0x00      
+                                        //EMERGENCY MODE
+#define EMERGENCY_BRIGHTNESS  0xFF      //255 - 100%
+#define EMERGENCY_MODE        0x01
+                                        //MAINTENCE MODE
+#define MAINTENCE_BRIGTHNESS  0x00      //0 - 0%
+#define MAINTENCE_MODE        0x02
+uint8_t light_config[3] =  {DEFAULT_MODE, DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS};  //[MODE] - [BRIGHTNESS] - [CURRENT_BRIGHTNESS]
 
 //WiFi Configuration
 #ifdef WIFI_ENABLE
 //#define HOME
-#define DUMP
+//#define DUMP
 //#define BLUE_CAFFE
 //#define RETRO
-//#define MOBITEL
+#define MOBITEL
 //#define DOMACIN
 //#define EXELIA
 //#define GREENPARK
@@ -102,9 +111,9 @@ uint8_t light_config[2] =  {0, 0};  //[STATE] - [BRIGHTNESS]
 
 //Server configuration
 #ifdef SERVER_CONNECT
-#define HOST  "192.168.88.168"
-#define PATH  "/" 
-#define PORT  2000
+#define HOST  "ats-infokup.azurewebsites.net"
+#define PATH  "" 
+#define PORT  80
 #define TEST_DATA "test123"
 #endif //SERVER_CONNECT
 
@@ -124,7 +133,9 @@ extern String Rcontent;
 #define COMMAND_CO2_UPDATE  0x02
 #define COMMAND_ERROR       0x03
 #define COMMAND_UNIT_INIT   0x04
-#define COMMAND_LAMPMODE    0x07
+#define COMMAND_DIM_UPDATE  0x05
+#define COMMAND_OTA_UPDATE  0x06
+#define COMMAND_LAMP_MODE   0x07
 
 //ERROR defions
 #define ERR_CO2SENS_FALIURE 0x01
@@ -154,11 +165,12 @@ extern String Rcontent;
 
 //VEHICLE_PASS configuration
 #define   TIMER_VP_COMPARE  180000
-uint32_t  previousTime = 0;
+uint32_t  previousTime_VP = 0;
 uint8_t   car_num = 0;
 
 //CO2_UPDATE configuration
 #define TIMER_CU_COMPARE 300000
+uint32_t previousTime_CU = 0;
 
 /****************************************************************************
  *                            Public functions
@@ -184,12 +196,13 @@ void getDeviceInfo(){
   uint64_t MACBuffer = 0;
   uint8_t COUNTER;
 
+  Serial.println("========================");
   Serial.println("Device info:");
 
   //Get device MAC adress
   WiFi.macAddress(MAC);
 
-  Serial.print("MAC Address: ");
+  Serial.println("MAC Address: ");
 
   for(COUNTER = 0; COUNTER < 6; COUNTER++){
     MACBuffer = (uint64_t)MAC[COUNTER] << (40 - (8 * COUNTER)) | MACBuffer;
@@ -205,12 +218,6 @@ void getDeviceInfo(){
   //Get device IP address
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
-
-  Serial.println("========================");
-  
-  //Get device I2C address
-  Serial.print("I2C Address: ");
-  Serial.println(I2C_ADDRESS);
 
   Serial.println("========================");
 
@@ -257,14 +264,16 @@ bool WiFiConnect(char ssid[], char password[]){
 
     #ifdef TEST_MODE
     Serial.print("Falied to connect to: "); Serial.println(ssid);
+    Serial.println("Restarting device...");
     #endif //TEST_MODE
+
+    ESP.restart();
 
     return false;
   }
 
   #ifdef TEST_MODE
   Serial.print("Succesfully connected to: "); Serial.println(ssid);
-  Serial.print("IP address: "); Serial.println(WiFi.localIP());
   #endif //TEST_MODE
 
   return true;
@@ -300,7 +309,10 @@ bool clientConnect(char host[], uint16_t port){
 
     #ifdef TEST_MODE
     Serial.println("Connection failed.");
+    Serial.println("Restarting device...");
     #endif //TEST_MODE
+
+    ESP.restart();
 
     return false;
   }
@@ -562,8 +574,32 @@ void lightFadeTest(){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-16-2018
  ***************************************************************************/
-void updateLights(){
-  setLED(LEDC_CHANNEL_0, 255);
+void updateLights(bool pass){
+
+  //If car passed by light pole
+  if(light_config[0] == DEFAULT_MODE){
+    if(pass = true){
+      setLED(LEDC_CHANNEL_0, 255);
+      light_config[2] = 255;
+    }
+    else{
+      if(light_config[2] >= light_config[1]){
+
+        light_config[2] -= 5;
+
+        if(light_config[2] < light_config[1]){
+            light_config[2] = light_config[1];
+        }
+      }
+    }
+  }
+  else if(light_config[0] == EMERGENCY_MODE){
+    setLED(LEDC_CHANNEL_0, EMERGENCY_BRIGHTNESS);
+  }
+  else if(light_config[0] == MAINTENCE_MODE){
+    setLED(LEDC_CHANNEL_0, MAINTENCE_BRIGTHNESS);
+  }
+
 }
 
 /****************************************************************************
@@ -622,7 +658,10 @@ void command_UnitInit(uint64_t DATA){
  *  @date:        11-20-2018
  ***************************************************************************/
 void command_DimUpdate(uint64_t DATA){
+
+  uint8_t brightness = (uint8_t)DATA >> 4 & 0xFF;
   
+  light_config[1] = brightness;
 }
 
 /****************************************************************************
@@ -717,17 +756,17 @@ bool commandHandler(){
         command_UnitInit(dataValue);
       break;
 
-      case DIM_UPDATE: //DIM_UPDATE
+      case COMMAND_DIM_UPDATE: //DIM_UPDATE
 
         command_DimUpdate(dataValue); 
       break;
 
-      case 0x06: //OTA
+      case COMMAND_OTA_UPDATE: //OTA
 
         command_OTA(dataValue);
       break;
 
-      case COMMAND_LAMPMODE: //LAMP_MODE
+      case COMMAND_LAMP_MODE: //LAMP_MODE
 
         command_LampMode(dataValue);
       break;
@@ -767,6 +806,7 @@ bool commandHandler(){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        01-05-2019
  ***************************************************************************/
+#ifdef US_CONNECTED
 uint8_t ultrasonicCarRead(){
 
   uint64_t duration; 
@@ -818,6 +858,44 @@ uint8_t ultrasonicCarRead(){
   }
 
 }
+#endif //US_CONNECTED
+
+/****************************************************************************
+ *  @name:        sendError
+ *  *************************************************************************
+ *  @brief:       sends ERROR to the server
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      [true]  - read data includes command
+ *                [false] - read data is false
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        01-14-2019
+ ***************************************************************************/
+bool sendError(uint8_t error){
+  switch(error){
+
+    #ifdef US_CONNECTED
+    case ERR_CARSENS_FALIURE:
+
+    break;
+    #endif //US_CONNECTED
+
+    case ERR_CO2SENS_FALIURE:
+
+    break;
+
+    case ERR_LIGHT_FALIURE:
+
+    break;
+
+    default:
+    return false; //NO COMMAND FOUND!
+  }
+  return true;
+}
 /****************************************************************************
  *  @name:        checkCarPass
  *  *************************************************************************
@@ -833,33 +911,66 @@ uint8_t ultrasonicCarRead(){
  ***************************************************************************/
 void checkCarPass(){
 
+  #ifdef US_CONNECTED
   if(ultrasonicCarRead() > 0){
+
     car_num++;
 
-    updateLights();
+    updateLights(true);
   }
+
+  else{
+
+    updateLights(false);
+  }
+  #else
+  updateLights(false);
+  #endif //US_CONNECTED
 
   uint32_t currentTime = millis();
 
-  if(currentTime == previousTime + TIMER_VP_COMPARE){
+  if(currentTime == previousTime_VP + TIMER_VP_COMPARE){
 
-    previousTime = currentTime;
+    previousTime_VP = currentTime;
 
     #ifdef TEST_MODE
     Serial.print("Passed Cars: ");
     Serial.println(car_num);
     #endif //TEST_MODE
 
-    //vehicleStateUpdate(car_num);
+    vehicleStateUpdate(car_num);
 
     car_num = 0;
   }
 }
 
 /****************************************************************************
+ *  @name:        readCO2Sensor
+ *  *************************************************************************
+ *  @brief:       Reads data from sensor
+ *  @note:        
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:      [data] - sensor value
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        12-01-2018
+ ***************************************************************************/
+uint16_t readCO2Sensor(){
+
+  uint32_t sensorRead = millis();
+  uint16_t data;
+
+  data = (uint16_t)sensorRead >> 22 & 0x3FF;
+  
+  return  data;
+}
+
+/****************************************************************************
  *  @name:        checkCO2Emissions
  *  *************************************************************************
- *  @brief:       Reads data from sensor and saves emissions
+ *  @brief:       sends data from CO2 sensor to server
  *  @note:        
  *  *************************************************************************
  *  @param[in]:   
@@ -867,10 +978,24 @@ void checkCarPass(){
  *  @return:      
  *  *************************************************************************
  *  @author:      Ivan Pavao Lozancic
- *  @date:        12-01-2018
+ *  @date:        01-14-2019
  ***************************************************************************/
 void checkCO2Emissions(){
 
+  uint32_t currentTime = millis();
+  uint16_t dataBuffer;
+  String data;
+
+  if(currentTime >= TIMER_CU_COMPARE + previousTime_CU){
+
+    previousTime_CU = currentTime;
+
+    dataBuffer = (uint16_t)readCO2Sensor() << 4 | COMMAND_CO2_UPDATE;
+
+    data = String(dataBuffer);
+
+    client.sendJSON("", data);
+  }
 }
 
 /****************************************************************************
@@ -891,13 +1016,13 @@ void Hardware(){
   //Light setup
   ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_TIMER_13_BIT);
   ledcAttachPin(LIGHT_PIN, LEDC_CHANNEL_0);
+  pinMode(LED_BUILTIN, OUTPUT);
 
   //HC-SR04 setup
+  #ifdef US_CONNECTED
   pinMode(US_ECHO, INPUT);
   pinMode(US_TRIGGER, OUTPUT);
-
-  //I2C setup
-  Wire.begin();
+  #endif //US_CONNECTED
 }
 
 /****************************************************************************
@@ -905,10 +1030,13 @@ void Hardware(){
  ***************************************************************************/
 void setup() {
 
+  #ifdef TEST_MODE
   Serial.begin(BAUD_RATE);
-
+  #endif //TEST_MODE
+  
   Hardware();
 
+  //Flash the builtin LED
   digitalWrite(LED_BUILTIN, HIGH);
   delay(1000);
   digitalWrite(LED_BUILTIN, LOW);
@@ -923,16 +1051,18 @@ void setup() {
 
   sendCommand_UnitInit();
   
+  #ifdef TEST_COMMANDS
   sendTestData_SOCKETIO(COMMAND_VEHICLEPASS);
   sendTestData_SOCKETIO(COMMAND_CO2_UPDATE);
   sendTestData_SOCKETIO(COMMAND_ERROR);
+  #endif //TEST_COMMANDS
   #endif //SERVER_CONNECT
   #endif //WIFI_ENABLE
 
-  //Wire.write("TEST");
-
+  #ifdef TEST_MODE
   getDeviceInfo();
- 
+  #endif //TEST_MODE
+
 }
 
 /****************************************************************************
@@ -943,5 +1073,7 @@ void loop() {
   checkCarPass();
 
   commandHandler();
+
+  checkCO2Emissions();
 
 }
