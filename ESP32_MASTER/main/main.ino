@@ -57,11 +57,11 @@ uint8_t light_config[3] =  {DEFAULT_MODE, DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS
 
 //WiFi Configuration
 #ifdef WIFI_ENABLE
-//#define HOME
+#define HOME
 //#define DUMP
 //#define BLUE_CAFFE
 //#define RETRO
-#define MOBITEL
+//#define MOBITEL
 //#define DOMACIN
 //#define EXELIA
 //#define GREENPARK
@@ -591,6 +591,7 @@ void updateLights(bool pass){
             light_config[2] = light_config[1];
         }
       }
+      setLED(LEDC_CHANNEL_0, light_config[2]);
     }
   }
   else if(light_config[0] == EMERGENCY_MODE){
@@ -641,7 +642,11 @@ void vehicleStateUpdate(uint8_t CAR_NUM){
  ***************************************************************************/
 void command_UnitInit(uint64_t DATA){
 
-
+  #ifdef TEST_MODE
+  Serial.println("==========COMMAND================================");
+  Serial.println("");
+  Serial.println("=================================================");
+  #endif //TEST_MODE
 }
 
 /****************************************************************************
@@ -655,13 +660,20 @@ void command_UnitInit(uint64_t DATA){
  *  @return:      
  *  *************************************************************************
  *  @author:      Ivan Pavao Lozancic
- *  @date:        11-20-2018
+ *  @date:        15-01-2019
  ***************************************************************************/
 void command_DimUpdate(uint64_t DATA){
 
-  uint8_t brightness = (uint8_t)DATA >> 4 & 0xFF;
+  uint8_t brightness = (DATA >> 4) & 0xFF;
   
   light_config[1] = brightness;
+
+  #ifdef TEST_MODE
+  Serial.println("==========COMMAND================================");
+  Serial.print("Brightness of the light was changed to: ");
+  Serial.println(brightness);
+  Serial.println("=================================================");
+  #endif //TEST_MODE
 }
 
 /****************************************************************************
@@ -678,7 +690,12 @@ void command_DimUpdate(uint64_t DATA){
  *  @date:        11-20-2018
  ***************************************************************************/
 void command_OTA(uint64_t DATA){
-  
+
+  #ifdef TEST_MODE
+  Serial.println("==========COMMAND================================");
+  Serial.println("");
+  Serial.println("=================================================");
+  #endif //TEST_MODE
 }
 
 /****************************************************************************
@@ -695,7 +712,17 @@ void command_OTA(uint64_t DATA){
  *  @date:        01-12-2019
  ***************************************************************************/
 void command_LampMode(uint64_t DATA){
-  
+
+  uint8_t LAMP_MODE = DATA >> 4 & 0xFF;
+
+  light_config[0] = LAMP_MODE;
+
+  #ifdef TEST_MODE
+  Serial.println("==========COMMAND================================");
+  Serial.print("Lamp mode changed to: "); 
+  Serial.println(LAMP_MODE);
+  Serial.println("=================================================");
+  #endif //TEST_MODE
 }
 
 /****************************************************************************
