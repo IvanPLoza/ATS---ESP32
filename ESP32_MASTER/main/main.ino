@@ -4,7 +4,7 @@
  *  @brief:
  *  @note:
  *           
- *  @author:      Ivan Pavao Lozancic ivanplozancic@gmail.com
+ *  @author:      Ivan Pavao Lozancic ivanl@dump.hr
  *  @date:        11-12-2018
  ****************************************************************************/
 #include <WiFi.h>
@@ -111,10 +111,12 @@ uint8_t light_config[3] =  {DEFAULT_MODE, DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS
 
 //Server configuration
 #ifdef SERVER_CONNECT
+#define TIMER_POOL_COMPARE 5000
 #define HOST  "ats-infokup.azurewebsites.net"
 #define PATH  "" 
 #define PORT  80
 #define TEST_DATA "test123"
+uint32_t previousTime_POOL = 0;
 #endif //SERVER_CONNECT
 
 #ifdef WEBSOCKET
@@ -171,6 +173,10 @@ uint8_t   car_num = 0;
 //CO2_UPDATE configuration
 #define TIMER_CU_COMPARE 300000
 uint32_t previousTime_CU = 0;
+
+//ERROR configuration
+#define TIMER_ERR_COMPARE 5000
+uint32_t previousTime_ERR = 0;
 
 /****************************************************************************
  *                            Public functions
@@ -315,6 +321,31 @@ bool clientConnect(char host[], uint16_t port){
     ESP.restart();
 
     return false;
+  }
+}
+
+/****************************************************************************
+ *  @name:        poolServer
+ *  *************************************************************************
+ *  @brief:       Sends empty data to not lose connection to the server
+ *  @note:
+ *  *************************************************************************
+ *  @param[in]:   
+ *  @param[out]:   
+ *  @return:     
+ *  *************************************************************************
+ *  @author:      Ivan Pavao Lozancic
+ *  @date:        01-16-2019
+ ***************************************************************************/
+void poolServer(){
+
+  uint32_t currentTime = millis();
+
+  if(currentTime > previousTime_POOL + TIMER_POOL_COMPARE){
+
+    client.sendJSON("", "");
+
+    previousTime_POOL = currentTime;
   }
 }
 
@@ -578,7 +609,7 @@ void updateLights(bool pass){
 
   //If car passed by light pole
   if(light_config[0] == DEFAULT_MODE){
-    if(pass = true){
+    if(pass == true){
       setLED(LEDC_CHANNEL_0, 255);
       light_config[2] = 255;
     }
@@ -853,36 +884,52 @@ uint8_t ultrasonicCarRead(){
   // Calculating the distance
   distance = duration*0.034/2;
 
-  if(distance > SECOND_LANE_COMP){
+  #ifdef TEST_MODE_US
+  Serial.print("Distance: ");
+  Serial.println(distance);
+  #endif //TEST_MODE_US
 
-    //THERE IS NO CAR
+  if(distance != 0){
 
-    #ifdef TEST_MODE_US
-    Serial.println("US_CarCheck: No car detected.");
-    #endif //TEST_MODE_US
+    if(distance > SECOND_LANE_COMP){
 
-    return 0;
+      //THERE IS NO CAR
+
+      #ifdef TEST_MODE_US
+      Serial.println("US_CarCheck: No car detected.");
+      #endif //TEST_MODE_US
+
+      return 0;
+    }
+
+    else if(distance > FIRST_LANE_COMP && distance <= SECOND_LANE_COMP){
+
+      //CAR ON SECOND LANE
+
+      #ifdef TEST_MODE_US
+      Serial.println("US_CarCheck: Car is on second lane.");
+      #endif //TEST_MODE_US
+
+      return 2;
+    }
+
+    else if(distance <= FIRST_LANE_COMP){
+
+      //CAR ON FIRST LANE
+
+      #ifdef TEST_MODE_US
+      Serial.println("US_CarCheck: Car is on first lane.");
+      #endif //TEST_MODE_US
+
+      return 1;
+    }
   }
-  else if(distance > FIRST_LANE_COMP && distance <= SECOND_LANE_COMP){
 
-    //CAR ON SECOND LANE
+  sendError(ERR_CARSENS_FALIURE);
+  
+  return 0; 
 
-    #ifdef TEST_MODE_US
-    Serial.println("US_CarCheck: Car is on second lane.");
-    #endif //TEST_MODE_US
 
-    return 2;
-  }
-  else if(distance <= FIRST_LANE_COMP){
-
-    //CAR ON FIRST LANE
-
-    #ifdef TEST_MODE_US
-    Serial.println("US_CarCheck: Car is on first lane.");
-    #endif //TEST_MODE_US
-
-    return 1;
-  }
 
 }
 #endif //US_CONNECTED
@@ -902,25 +949,52 @@ uint8_t ultrasonicCarRead(){
  *  @date:        01-14-2019
  ***************************************************************************/
 bool sendError(uint8_t error){
+
+  String data;
+  uint8_t dataBuffer;
+  uint32_t currentTime = millis();
+
   switch(error){
 
     #ifdef US_CONNECTED
     case ERR_CARSENS_FALIURE:
+
+      dataBuffer = ERR_CARSENS_FALIURE << 4 | COMMAND_ERROR;
 
     break;
     #endif //US_CONNECTED
 
     case ERR_CO2SENS_FALIURE:
 
+      dataBuffer = ERR_CO2SENS_FALIURE << 4 | COMMAND_ERROR;
+
     break;
 
     case ERR_LIGHT_FALIURE:
 
+      dataBuffer = ERR_LIGHT_FALIURE << 4 | COMMAND_ERROR;
+
     break;
 
     default:
+
     return false; //NO COMMAND FOUND!
   }
+
+  data = String(dataBuffer);
+
+  if(currentTime >= previousTime_ERR + TIMER_ERR_COMPARE){
+
+    client.sendJSON("", data);
+
+    previousTime_ERR = currentTime;
+
+    #ifdef TEST_MODE
+    Serial.print("DataBuffer sent on ERROR command: "); Serial.println(String(dataBuffer)); 
+    Serial.print("ERROR: "); Serial.print(String(dataBuffer >> 4 & 0xF)); Serial.println(" was sent to server.");
+    #endif //TEST_MODE
+  }
+
   return true;
 }
 /****************************************************************************
@@ -1090,6 +1164,8 @@ void setup() {
   getDeviceInfo();
   #endif //TEST_MODE
 
+  sendTestData_SOCKETIO(COMMAND_ERROR);
+
 }
 
 /****************************************************************************
@@ -1097,10 +1173,22 @@ void setup() {
  ***************************************************************************/
 void loop() {
 
-  checkCarPass();
+   while(client.connected() && WiFi.status() == WL_CONNECTED){
+    checkCarPass();
 
-  commandHandler();
+    commandHandler();
 
-  checkCO2Emissions();
+    checkCO2Emissions();
 
+    poolServer();
+  }
+
+  Serial.println("Disconnected! Internet lost or server down. Restarting device in 2 seconds!");
+
+  setLED(LEDC_CHANNEL_0, 255);
+  delay(2000);
+  setLED(LEDC_CHANNEL_0, 0);
+
+  ESP.restart();
+  
 }
