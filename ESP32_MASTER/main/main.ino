@@ -30,14 +30,14 @@
 #define TEST_MODE
 //#define TEST_MODE_US
 //#define TEST_COMMANDS
-//#define US_CONNECTED
 //#define TEST_MODE_SERVER_READ
+#define US_CONNECTED
 
 //HC-SR04 Configuration
-#define US_ECHO           0x0C
-#define US_TRIGGER        0x0E
-#define FIRST_LANE_COMP   20
-#define SECOND_LANE_COMP  40
+#define US_ECHO           0x0C  //GPIO-
+#define US_TRIGGER        0x0E  //GPIO-
+#define FIRST_LANE_COMP   10
+#define SECOND_LANE_COMP  30
 
 //LED PWM Control setup
 #define LEDC_CHANNEL_0          0         //Use channel 0 of max 16
@@ -46,7 +46,7 @@
 #define LIGHT_PIN               0x1B      //GPIO-27
 #define LIGHT_FADE_TIME_COMPARE 50
                                         //DEFAULT MODE
-#define DEFAULT_BRIGHTNESS      0x7F      //127 - 50%
+#define DEFAULT_BRIGHTNESS      25      //127 - 50%
 #define DEFAULT_MODE            0x00      
                                         //EMERGENCY MODE
 #define EMERGENCY_BRIGHTNESS    0xFF      //255 - 100%
@@ -168,9 +168,12 @@ extern String Rcontent;
 #define ID     0x02
 
 //VEHICLE_PASS configuration
-#define   TIMER_VP_COMPARE  180000
+#define   TIMER_VP_COMPARE    180000
+#define   TIMER_VP_CHECK_COMP 700
+uint32_t  previousTime_VP_UP = 0;
 uint32_t  previousTime_VP = 0;
 uint8_t   car_num = 0;
+uint8_t   ultrasonicFaliureOverflow = 0;
 
 //CO2_UPDATE configuration
 #define TIMER_CU_COMPARE 300000
@@ -907,7 +910,9 @@ uint8_t ultrasonicCarRead(){
 
   if(distance != 0){
 
-    if(distance > SECOND_LANE_COMP){
+    ultrasonicFaliureOverflow = 0;
+
+    if(distance > FIRST_LANE_COMP){
 
       //THERE IS NO CAR
 
@@ -918,7 +923,7 @@ uint8_t ultrasonicCarRead(){
       return 0;
     }
 
-    else if(distance > FIRST_LANE_COMP && distance <= SECOND_LANE_COMP){
+    /*else if(distance > FIRST_LANE_COMP && distance <= SECOND_LANE_COMP){
 
       //CAR ON SECOND LANE
 
@@ -927,7 +932,7 @@ uint8_t ultrasonicCarRead(){
       #endif //TEST_MODE_US
 
       return 2;
-    }
+    }*/
 
     else if(distance <= FIRST_LANE_COMP){
 
@@ -941,7 +946,12 @@ uint8_t ultrasonicCarRead(){
     }
   }
 
-  sendError(ERR_CARSENS_FALIURE);
+  else if(ultrasonicFaliureOverflow > 5){
+
+    sendError(ERR_CARSENS_FALIURE);
+  }
+
+  ultrasonicFaliureOverflow++;
   
   return 0; 
 
@@ -1028,14 +1038,24 @@ bool sendError(uint8_t error){
  ***************************************************************************/
 void checkCarPass(){
 
+  uint32_t currentTime = millis();
+
   #ifdef US_CONNECTED
   if(ultrasonicCarRead() > 0){
+    
+    if(currentTime > previousTime_VP + TIMER_VP_CHECK_COMP){
 
-    car_num++;
+      previousTime_VP = currentTime;
+
+      car_num++;
+
+      #ifdef TEST_MODE
+      Serial.println("CAR PASSED!");
+      #endif //TEST_MODE
+    }
 
     updateLights(true);
   }
-
   else{
 
     updateLights(false);
@@ -1044,11 +1064,9 @@ void checkCarPass(){
   updateLights(false);
   #endif //US_CONNECTED
 
-  uint32_t currentTime = millis();
+  if(currentTime == previousTime_VP_UP + TIMER_VP_COMPARE){
 
-  if(currentTime == previousTime_VP + TIMER_VP_COMPARE){
-
-    previousTime_VP = currentTime;
+    previousTime_VP_UP = currentTime;
 
     #ifdef TEST_MODE
     Serial.print("Passed Cars: ");
