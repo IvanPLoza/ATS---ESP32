@@ -25,13 +25,13 @@
 
 //Board and code configuration
 #define BAUD_RATE   115200
-#define TEST_MODE
-//#define TEST_MODE_US //ULTRASONIC TEST
 #define WIFI_ENABLE
 #define SERVER_CONNECT
+#define TEST_MODE
+//#define TEST_MODE_US
 //#define TEST_COMMANDS
-//#define DEBUG
-#define US_CONNECTED
+//#define US_CONNECTED
+//#define TEST_MODE_SERVER_READ
 
 //HC-SR04 Configuration
 #define US_ECHO           0x0C
@@ -40,20 +40,22 @@
 #define SECOND_LANE_COMP  40
 
 //LED PWM Control setup
-#define LEDC_CHANNEL_0        0         //Use channel 0 of max 16
-#define LEDC_TIMER_13_BIT     13        //Precision
-#define LEDC_BASE_FREQ        5000      //PWM base freq
-#define LIGHT_PIN             0x1B      //GPIO-27
+#define LEDC_CHANNEL_0          0         //Use channel 0 of max 16
+#define LEDC_TIMER_13_BIT       13        //Precision
+#define LEDC_BASE_FREQ          5000      //PWM base freq
+#define LIGHT_PIN               0x1B      //GPIO-27
+#define LIGHT_FADE_TIME_COMPARE 50
                                         //DEFAULT MODE
-#define DEFAULT_BRIGHTNESS    0x7F      //127 - 50%
-#define DEFAULT_MODE          0x00      
+#define DEFAULT_BRIGHTNESS      0x7F      //127 - 50%
+#define DEFAULT_MODE            0x00      
                                         //EMERGENCY MODE
-#define EMERGENCY_BRIGHTNESS  0xFF      //255 - 100%
-#define EMERGENCY_MODE        0x01
+#define EMERGENCY_BRIGHTNESS    0xFF      //255 - 100%
+#define EMERGENCY_MODE          0x01
                                         //MAINTENCE MODE
-#define MAINTENCE_BRIGTHNESS  0x00      //0 - 0%
-#define MAINTENCE_MODE        0x02
+#define MAINTENCE_BRIGTHNESS    0x00      //0 - 0%
+#define MAINTENCE_MODE          0x02
 uint8_t light_config[3] =  {DEFAULT_MODE, DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS};  //[MODE] - [BRIGHTNESS] - [CURRENT_BRIGHTNESS]
+uint32_t previousTime_LIGHT = 0;
 
 //WiFi Configuration
 #ifdef WIFI_ENABLE
@@ -269,6 +271,7 @@ bool WiFiConnect(char ssid[], char password[]){
   if(WiFi.status() != WL_CONNECTED){
 
     #ifdef TEST_MODE
+    Serial.println();
     Serial.print("Falied to connect to: "); Serial.println(ssid);
     Serial.println("Restarting device...");
     #endif //TEST_MODE
@@ -318,7 +321,7 @@ bool clientConnect(char host[], uint16_t port){
     Serial.println("Restarting device...");
     #endif //TEST_MODE
 
-    ESP.restart();
+    //ESP.restart();
 
     return false;
   }
@@ -337,6 +340,7 @@ bool clientConnect(char host[], uint16_t port){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        01-16-2019
  ***************************************************************************/
+#ifdef SERVER_CONNECT
 void poolServer(){
 
   uint32_t currentTime = millis();
@@ -348,6 +352,7 @@ void poolServer(){
     previousTime_POOL = currentTime;
   }
 }
+#endif //SERVER_CONNECT
 
 /****************************************************************************
  *  @name:        clientHandshake
@@ -608,30 +613,38 @@ void lightFadeTest(){
 void updateLights(bool pass){
 
   //If car passed by light pole
-  if(light_config[0] == DEFAULT_MODE){
-    if(pass == true){
-      setLED(LEDC_CHANNEL_0, 255);
-      light_config[2] = 255;
-    }
-    else{
-      if(light_config[2] >= light_config[1]){
+  uint32_t currentTime = millis();
 
-        light_config[2] -= 5;
-
-        if(light_config[2] < light_config[1]){
-            light_config[2] = light_config[1];
-        }
+  if(currentTime > previousTime_LIGHT + LIGHT_FADE_TIME_COMPARE){
+    if(light_config[0] == DEFAULT_MODE){
+      if(pass == true){
+        setLED(LEDC_CHANNEL_0, 255);
+        light_config[2] = 255;
       }
-      setLED(LEDC_CHANNEL_0, light_config[2]);
-    }
-  }
-  else if(light_config[0] == EMERGENCY_MODE){
-    setLED(LEDC_CHANNEL_0, EMERGENCY_BRIGHTNESS);
-  }
-  else if(light_config[0] == MAINTENCE_MODE){
-    setLED(LEDC_CHANNEL_0, MAINTENCE_BRIGTHNESS);
-  }
+      else{
+        if(light_config[2] >= light_config[1]){
 
+          light_config[2] -= 5;
+
+          if(light_config[2] < light_config[1]){
+            light_config[2] = light_config[1];
+          }
+        }
+        else{
+          light_config[2] = light_config[1];
+        }
+        setLED(LEDC_CHANNEL_0, light_config[2]);
+      }
+    }
+    else if(light_config[0] == EMERGENCY_MODE){
+    setLED(LEDC_CHANNEL_0, EMERGENCY_BRIGHTNESS);
+    }
+    else if(light_config[0] == MAINTENCE_MODE){
+    setLED(LEDC_CHANNEL_0, MAINTENCE_BRIGTHNESS);
+    }
+
+    previousTime_LIGHT = currentTime;
+  }
 }
 
 /****************************************************************************
@@ -782,6 +795,7 @@ bool commandHandler(){
   if(client.monitor()){
 
     #ifdef TEST_MODE
+    Serial.println("==========SERVER=================================");
     Serial.print("Received data from server! Timestamp: "); Serial.println(millis());
     #endif //TEST_MODEž
 
@@ -800,7 +814,7 @@ bool commandHandler(){
 
     dataValue = (uint64_t)atoi(data);
 
-    #ifdef TEST_MODE 
+    #ifdef TEST_MODE_SERVER_READ 
     Serial.print("Recieved data decrypted value: "); Serial.println(data);
     Serial.print("Data value: "); Serial.println(int64String(dataValue));
     #endif //TEST_MODE
@@ -835,6 +849,7 @@ bool commandHandler(){
 
         #ifdef TEST_MODE
         Serial.println("Received invalid command/data from server.");
+        Serial.println("=================================================");
         #endif //TEST_MODE
 
         return false;
@@ -843,6 +858,7 @@ bool commandHandler(){
 
     #ifdef TEST_MODE
     Serial.print("Received command: "); Serial.println(command); Serial.println();
+    Serial.println("=================================================");
     #endif //TEST_MODE
 
     return true;
@@ -1165,7 +1181,6 @@ void setup() {
   #endif //TEST_MODE
 
   sendTestData_SOCKETIO(COMMAND_ERROR);
-
 }
 
 /****************************************************************************
@@ -1173,14 +1188,16 @@ void setup() {
  ***************************************************************************/
 void loop() {
 
-   while(client.connected() && WiFi.status() == WL_CONNECTED){
+  while(client.connected() && WiFi.status() == WL_CONNECTED){
     checkCarPass();
 
     commandHandler();
 
     checkCO2Emissions();
 
+    #ifdef SERVER_CONNECT
     poolServer();
+    #endif //TEST_MODE
   }
 
   Serial.println("Disconnected! Internet lost or server down. Restarting device in 2 seconds!");
@@ -1190,5 +1207,4 @@ void loop() {
   setLED(LEDC_CHANNEL_0, 0);
 
   ESP.restart();
-  
 }
