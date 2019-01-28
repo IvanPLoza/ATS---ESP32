@@ -59,8 +59,8 @@ uint32_t previousTime_LIGHT = 0;
 
 //WiFi Configuration
 #ifdef WIFI_ENABLE
-#define HOME
-//#define DUMP
+//#define HOME
+#define DUMP
 //#define BLUE_CAFFE
 //#define RETRO
 //#define MOBITEL
@@ -910,7 +910,12 @@ uint8_t ultrasonicCarRead(){
 
   if(distance != 0){
 
-    ultrasonicFaliureOverflow = 0;
+    if(ultrasonicFaliureOverflow != 0){
+
+      sendCommand_UnitInit();
+
+      ultrasonicFaliureOverflow = 0;
+    }
 
     if(distance > FIRST_LANE_COMP){
 
@@ -945,18 +950,16 @@ uint8_t ultrasonicCarRead(){
       return 1;
     }
   }
+  else if(ultrasonicFaliureOverflow <= 5){
 
-  else if(ultrasonicFaliureOverflow > 5){
+    ultrasonicFaliureOverflow++;
+  }
+  else if(ultrasonicFaliureOverflow == 5){
 
     sendError(ERR_CARSENS_FALIURE);
   }
-
-  ultrasonicFaliureOverflow++;
   
-  return 0; 
-
-
-
+  return 0;
 }
 #endif //US_CONNECTED
 
@@ -1197,8 +1200,6 @@ void setup() {
   #ifdef TEST_MODE
   getDeviceInfo();
   #endif //TEST_MODE
-
-  sendTestData_SOCKETIO(COMMAND_ERROR);
 }
 
 /****************************************************************************
