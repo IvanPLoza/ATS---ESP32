@@ -31,7 +31,7 @@
 //#define TEST_MODE_US
 //#define TEST_COMMANDS
 //#define TEST_MODE_SERVER_READ
-#define US_CONNECTED
+//#define US_CONNECTED
 
 //HC-SR04 Configuration
 #define US_ECHO           0x0C  //GPIO-
@@ -49,12 +49,14 @@
 #define DEFAULT_BRIGHTNESS      25      //127 - 50%
 #define DEFAULT_MODE            0x00      
                                         //EMERGENCY MODE
-#define EMERGENCY_BRIGHTNESS    0xFF      //255 - 100%
+#define EMERGENCY_BRIGHTNESS    0xFF    //255 - 100%
 #define EMERGENCY_MODE          0x01
                                         //MAINTENCE MODE
-#define MAINTENCE_BRIGTHNESS    0x00      //0 - 0%
+#define MAINTENCE_BRIGTHNESS    0x00    //0 - 0%
 #define MAINTENCE_MODE          0x02
-uint8_t light_config[3] =  {DEFAULT_MODE, DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS};  //[MODE] - [BRIGHTNESS] - [CURRENT_BRIGHTNESS]
+                                        //ALWAYS_ON
+#define DEFAULT_ALWAYS_ON        0x00   // 0 - OFF
+uint8_t light_config[4] =  {DEFAULT_MODE, DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS, DEFAULT_ALWAYS_ON};  //[MODE] - [BRIGHTNESS] - [CURRENT_BRIGHTNESS] - [ALWAYS_ON]
 uint32_t previousTime_LIGHT = 0;
 
 //WiFi Configuration
@@ -619,15 +621,15 @@ void updateLights(bool pass){
   uint32_t currentTime = millis();
 
   if(currentTime > previousTime_LIGHT + LIGHT_FADE_TIME_COMPARE){
-    if(light_config[0] == DEFAULT_MODE){
+    if(light_config[0] == DEFAULT_MODE && light_config[3] == 0){
       if(pass == true){
         setLED(LEDC_CHANNEL_0, 255);
         light_config[2] = 255;
       }
       else{
-        if(light_config[2] >= light_config[1]){
+        if(light_config[2] > light_config[1]){
 
-          light_config[2] -= 5;
+          light_config[2]-= 5;
 
           if(light_config[2] < light_config[1]){
             light_config[2] = light_config[1];
@@ -638,6 +640,9 @@ void updateLights(bool pass){
         }
         setLED(LEDC_CHANNEL_0, light_config[2]);
       }
+    }
+    else if(light_config[0] == DEFAULT_MODE && light_config[3] == 1){
+      setLED(LEDC_CHANNEL_0, light_config[2]);
     }
     else if(light_config[0] == EMERGENCY_MODE){
     setLED(LEDC_CHANNEL_0, EMERGENCY_BRIGHTNESS);
@@ -712,13 +717,15 @@ void command_UnitInit(uint64_t DATA){
 void command_DimUpdate(uint64_t DATA){
 
   uint8_t brightness = (DATA >> 4) & 0xFF;
+  uint8_t alwaysOn_mode = (DATA >> 5) & 0x01;
   
-  light_config[1] = brightness;
+  light_config[1] = brightness;     //Set new defualt brightness of the light
+  light_config[3] = alwaysOn_mode;  //Set new AlwaysOn mode
 
   #ifdef TEST_MODE
   Serial.println("==========COMMAND================================");
-  Serial.print("Brightness of the light was changed to: ");
-  Serial.println(brightness);
+  Serial.print("Brightness of the light was changed to: "); Serial.println(brightness);
+  Serial.print("Lamp always_on mode was changed to: "); Serial.println(alwaysOn_mode);
   Serial.println("=================================================");
   #endif //TEST_MODE
 }
@@ -860,7 +867,7 @@ bool commandHandler(){
     }
 
     #ifdef TEST_MODE
-    Serial.print("Received command: "); Serial.println(command); Serial.println();
+    Serial.print("Received command: "); Serial.println(command);
     Serial.println("=================================================");
     #endif //TEST_MODE
 
@@ -911,8 +918,10 @@ uint8_t ultrasonicCarRead(){
   if(distance != 0){
 
     if(ultrasonicFaliureOverflow != 0){
-
-      sendCommand_UnitInit();
+      
+      if(ultrasonicFaliureOverflow == 10){
+        sendCommand_UnitInit();
+      }
 
       ultrasonicFaliureOverflow = 0;
     }
@@ -920,7 +929,6 @@ uint8_t ultrasonicCarRead(){
     if(distance > FIRST_LANE_COMP){
 
       //THERE IS NO CAR
-
       #ifdef TEST_MODE_US
       Serial.println("US_CarCheck: No car detected.");
       #endif //TEST_MODE_US
@@ -950,11 +958,11 @@ uint8_t ultrasonicCarRead(){
       return 1;
     }
   }
-  else if(ultrasonicFaliureOverflow <= 5){
+  else if(ultrasonicFaliureOverflow < 10){
 
     ultrasonicFaliureOverflow++;
   }
-  else if(ultrasonicFaliureOverflow == 5){
+  else if(ultrasonicFaliureOverflow == 10){
 
     sendError(ERR_CARSENS_FALIURE);
   }
