@@ -716,7 +716,11 @@ bool commandHandler(){
 
     #ifdef TEST_MODE
     Serial.print("Received command: "); Serial.println(command);
+<<<<<<< HEAD
     Serial.println("================================================="); Serial.println("");
+=======
+    Serial.println("=================================================");
+>>>>>>> 12fa0f54de05b424c160da84eb96bec0641e9e42
     #endif //TEST_MODE
 
     return true;
