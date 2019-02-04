@@ -49,65 +49,24 @@
 #define DEFAULT_BRIGHTNESS      25      //127 - 50%
 #define DEFAULT_MODE            0x00      
                                         //EMERGENCY MODE
-#define EMERGENCY_BRIGHTNESS    0xFF      //255 - 100%
+#define EMERGENCY_BRIGHTNESS    0xFF    //255 - 100%
 #define EMERGENCY_MODE          0x01
                                         //MAINTENCE MODE
-#define MAINTENCE_BRIGTHNESS    0x00      //0 - 0%
+#define MAINTENCE_BRIGTHNESS    0x00    //0 - 0%
 #define MAINTENCE_MODE          0x02
-uint8_t light_config[3] =  {DEFAULT_MODE, DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS};  //[MODE] - [BRIGHTNESS] - [CURRENT_BRIGHTNESS]
+                                        //ALWAYS_ON
+#define DEFAULT_ALWAYS_ON        0x00   // 0 - OFF
+uint8_t light_config[4] =  {DEFAULT_MODE, DEFAULT_BRIGHTNESS, DEFAULT_BRIGHTNESS, DEFAULT_ALWAYS_ON};  //[MODE] - [BRIGHTNESS] - [CURRENT_BRIGHTNESS] - [ALWAYS_ON]
 uint32_t previousTime_LIGHT = 0;
 
 //WiFi Configuration
 #ifdef WIFI_ENABLE
-//#define HOME
-#define DUMP
-//#define BLUE_CAFFE
-//#define RETRO
-//#define MOBITEL
-//#define DOMACIN
-//#define EXELIA
-//#define GREENPARK
+#define HOT_SPOT
 
-#ifdef HOME
-#define SSID      "Jonelo2"
-#define PASSWORD  "172030ZN"
+#ifdef HOT_SPOT
+#define SSID      "ATS - Hotspot"
+#define PASSWORD  "ats123A"
 #endif //HOME
-
-#ifdef BLUE_CAFFE
-#define SSID      "Blue Eyes"
-#define PASSWORD  "blueeyes"
-#endif //BLUE_EYES
-
-#ifdef DUMP
-#define SSID      "dump"
-#define PASSWORD  "Dump.12345"
-#endif  //DUMP
-
-#ifdef RETRO
-#define SSID      "Retro_Caffe"
-#define PASSWORD  "Lozinka12345"
-#endif //RETRO
-
-#ifdef MOBITEL
-#define SSID      "loza"
-#define PASSWORD  "la123456"
-#endif
-
-#ifdef DOMACIN
-#define SSID      "Domacin"
-#define PASSWORD  "domacin123"
-#endif //DOMACIN
-
-#ifdef EXELIA
-#define SSID      "Exelia"
-#define PASSWORD  "nismofirma"
-#endif //EXELIA
-
-#ifdef GREENPARK
-#define SSID      "GreenPark"   
-#define PASSWORD  "greenpark99"
-#endif //GREENPARK
-
 
 #endif //WIFI_ENABLE
 
@@ -117,20 +76,13 @@ uint32_t previousTime_LIGHT = 0;
 #define HOST  "ats-infokup.azurewebsites.net"
 #define PATH  "" 
 #define PORT  80
-#define TEST_DATA "test123"
 uint32_t previousTime_POOL = 0;
-#endif //SERVER_CONNECT
-
-#ifdef WEBSOCKET
-WebSocketClient webSocketClient;
-WiFiClient client;
-#else
 SocketIOClient client;
 WiFiClient wificlient;
 extern String RID;
 extern String Rname;
 extern String Rcontent;
-#endif //WEBSOCKET
+#endif //SERVER_CONNECT
 
 //COMMANDS
 #define COMMAND_VEHICLEPASS 0x01
@@ -148,27 +100,12 @@ extern String Rcontent;
 
 //TEST_DATA
 #define TESTDATA_COMMAND_VEHICLEPASS  0x81         
-//10000001 + command = 100000010001 = 2065
-//129
-
 #define TESTDATA_COMMAND_CO2UPDATE    0x201       
-//1000000001 + command = 10000000010010 = 8210
-//513
-
-#define TESTDATA_COMMAND_ERROR        0x03      
-//11 + command = 110011 = 51
-//3
-
+#define TESTDATA_COMMAND_ERROR        0x03
 #define TESTDATA_COMMAND_UNIT_INIT    0x800000000001
-//100000000000000000000000000000000000000000000001 + command = 2251799813685268
-//140737488355329 
-
-//TEMP DATA 
-#define SECTOR 0x01
-#define ID     0x02
 
 //VEHICLE_PASS configuration
-#define   TIMER_VP_COMPARE    180000
+#define   TIMER_VP_COMPARE    60000
 #define   TIMER_VP_CHECK_COMP 700
 uint32_t  previousTime_VP_UP = 0;
 uint32_t  previousTime_VP = 0;
@@ -308,6 +245,7 @@ bool WiFiConnect(char ssid[], char password[]){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-12-2018
  ***************************************************************************/
+#ifdef SERVER_CONNECT
 bool clientConnect(char host[], uint16_t port){
 
   if(client.connect(host, port)){
@@ -329,6 +267,7 @@ bool clientConnect(char host[], uint16_t port){
     return false;
   }
 }
+#endif //SERVER_CONNECT
 
 /****************************************************************************
  *  @name:        poolServer
@@ -358,44 +297,6 @@ void poolServer(){
 #endif //SERVER_CONNECT
 
 /****************************************************************************
- *  @name:        clientHandshake
- *  *************************************************************************
- *  @brief:       WebSocket client handshake (connect) function 
- *  @note:
- *  *************************************************************************
- *  @param[in]:   char path []
- *                char host []
- *  @param[out]:   
- *  @return:      [true]  = client connection is established
- *                [false] = client connection failed
- *  *************************************************************************
- *  @author:      Ivan Pavao Lozancic
- *  @date:        11-12-2018
- ***************************************************************************/
-#ifdef WEBSOCKET
-bool clientHandshake(char path[], char host[]){
-
-  webSocketClient.path = path;
-  webSocketClient.host = host;
-
-  if(webSocketClient.handshake(client)) {
-
-    #ifdef TEST_MODE
-    Serial.println("Handshake with WebSocket server was successful!");
-    #endif //TEST_MODE
-
-    return true;
-  }
-
-  #ifdef TEST_MODE
-  Serial.println("Handshake with WebSocket server failed.");
-  #endif //TEST_MODE
-    
-  return false;
-}
-#endif //WEBSOCKET
-
-/****************************************************************************
  *  @name:        testCommunication
  *  *************************************************************************
  *  @brief:       Sends and receives data if WebSocket communication is 
@@ -411,32 +312,7 @@ bool clientHandshake(char path[], char host[]){
  *  @author:      Ivan Pavao Lozancic
  *  @date:        11-12-2018
  ***************************************************************************/
-#ifdef WEBSOCKET
-bool testCommunication_WEBSOCKET(){
 
-  String dataReceived; //Received data
-
-  webSocketclient.sendData(TEST_DATA);
-  webSocketClient.getData(dataReceived);
-
-  if(dataReceived.length() > 0){
-
-    #ifdef TEST_MODE
-    Serial.println("Communication is working.");
-    Serial.print("Received data: ");
-    Serial.println(dataReceived);
-    #endif //TEST_MODE
-
-    return true;
-  }
-
-  #ifdef TEST_MODE
-  Serial.println("Communication falied!");
-  #endif //TEST_MODE
-
-  return false;
-}
-#endif //WEBSOCKET
 
 /****************************************************************************
  *  @name:        sendTestData_SOCKETIO
@@ -573,32 +449,6 @@ void setLED(uint8_t channel, uint32_t value, uint32_t valueMax = 255) {
   // write duty to LEDC
   ledcWrite(channel, duty);
 }
-/****************************************************************************
- *  @name:        lightFadeTest
- *  *************************************************************************
- *  @brief:       test light PWM control with fade mode
- *  @note:        
- *  *************************************************************************
- *  @param[in]:   
- *  @param[out]:   
- *  @return:     
- *  *************************************************************************
- *  @author:      Ivan Pavao Lozancic
- *  @date:        01-05-2019
- ***************************************************************************/
-void lightFadeTest(){
-
-  uint8_t COUNTER;
-
-  setLED(LEDC_CHANNEL_0, 0);
-
-  for(COUNTER = 0; COUNTER < 255; COUNTER++){
-    setLED(LEDC_CHANNEL_0, COUNTER);
-    delay(20);
-  }
-
-  setLED(LEDC_CHANNEL_0, 0);
-}
 
 /****************************************************************************
  *  @name:        updateLights
@@ -619,15 +469,15 @@ void updateLights(bool pass){
   uint32_t currentTime = millis();
 
   if(currentTime > previousTime_LIGHT + LIGHT_FADE_TIME_COMPARE){
-    if(light_config[0] == DEFAULT_MODE){
+    if(light_config[0] == DEFAULT_MODE && light_config[3] == 0){
       if(pass == true){
         setLED(LEDC_CHANNEL_0, 255);
         light_config[2] = 255;
       }
       else{
-        if(light_config[2] >= light_config[1]){
+        if(light_config[2] > light_config[1]){
 
-          light_config[2] -= 5;
+          light_config[2]-= 5;
 
           if(light_config[2] < light_config[1]){
             light_config[2] = light_config[1];
@@ -638,6 +488,9 @@ void updateLights(bool pass){
         }
         setLED(LEDC_CHANNEL_0, light_config[2]);
       }
+    }
+    else if(light_config[0] == DEFAULT_MODE && light_config[3] == 1){
+      setLED(LEDC_CHANNEL_0, light_config[2]);
     }
     else if(light_config[0] == EMERGENCY_MODE){
     setLED(LEDC_CHANNEL_0, EMERGENCY_BRIGHTNESS);
@@ -712,13 +565,15 @@ void command_UnitInit(uint64_t DATA){
 void command_DimUpdate(uint64_t DATA){
 
   uint8_t brightness = (DATA >> 4) & 0xFF;
+  uint8_t alwaysOn_mode = (DATA >> 5) & 0x01;
   
-  light_config[1] = brightness;
+  light_config[1] = brightness;     //Set new defualt brightness of the light
+  light_config[3] = alwaysOn_mode;  //Set new AlwaysOn mode
 
   #ifdef TEST_MODE
   Serial.println("==========COMMAND================================");
-  Serial.print("Brightness of the light was changed to: ");
-  Serial.println(brightness);
+  Serial.print("Brightness of the light was changed to: "); Serial.println(brightness);
+  Serial.print("Lamp always_on mode was changed to: "); Serial.println(alwaysOn_mode);
   Serial.println("=================================================");
   #endif //TEST_MODE
 }
@@ -860,8 +715,8 @@ bool commandHandler(){
     }
 
     #ifdef TEST_MODE
-    Serial.print("Received command: "); Serial.println(command); Serial.println();
-    Serial.println("=================================================");
+    Serial.print("Received command: "); Serial.println(command);
+    Serial.println("================================================="); Serial.println("");
     #endif //TEST_MODE
 
     return true;
@@ -911,8 +766,10 @@ uint8_t ultrasonicCarRead(){
   if(distance != 0){
 
     if(ultrasonicFaliureOverflow != 0){
-
-      sendCommand_UnitInit();
+      
+      if(ultrasonicFaliureOverflow == 10){
+        sendCommand_UnitInit();
+      }
 
       ultrasonicFaliureOverflow = 0;
     }
@@ -920,7 +777,6 @@ uint8_t ultrasonicCarRead(){
     if(distance > FIRST_LANE_COMP){
 
       //THERE IS NO CAR
-
       #ifdef TEST_MODE_US
       Serial.println("US_CarCheck: No car detected.");
       #endif //TEST_MODE_US
@@ -950,11 +806,11 @@ uint8_t ultrasonicCarRead(){
       return 1;
     }
   }
-  else if(ultrasonicFaliureOverflow <= 5){
+  else if(ultrasonicFaliureOverflow < 10){
 
     ultrasonicFaliureOverflow++;
   }
-  else if(ultrasonicFaliureOverflow == 5){
+  else if(ultrasonicFaliureOverflow == 10){
 
     sendError(ERR_CARSENS_FALIURE);
   }
