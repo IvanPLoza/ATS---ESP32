@@ -13,6 +13,6 @@ Main repository for Artificial Traffic System hardware development. Core include
  - White LED light
 
 ## Scheme
-![N|Solid](https://github.com/IvanPLoza/ATS.ESP32/blob/master/scheme.png)
+![N|Solid](https://github.com/IvanPLoza/ATS.ESP32/blob/test/scheme.png?raw=true)
 ## Additional information
 You can upload this code from Arduino IDE with ESP32 Arduino Core installed already.
