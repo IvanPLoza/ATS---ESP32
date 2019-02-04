@@ -31,7 +31,7 @@
 //#define TEST_MODE_US
 //#define TEST_COMMANDS
 //#define TEST_MODE_SERVER_READ
-//#define US_CONNECTED
+#define US_CONNECTED
 
 //HC-SR04 Configuration
 #define US_ECHO           0x0C  //GPIO-
@@ -170,7 +170,7 @@ extern String Rcontent;
 #define ID     0x02
 
 //VEHICLE_PASS configuration
-#define   TIMER_VP_COMPARE    180000
+#define   TIMER_VP_COMPARE    60000
 #define   TIMER_VP_CHECK_COMP 700
 uint32_t  previousTime_VP_UP = 0;
 uint32_t  previousTime_VP = 0;
